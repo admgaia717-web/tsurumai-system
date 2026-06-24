@@ -1,33 +1,22 @@
-name: Deploy to ConoHa WING
+name: Deploy to Cloudflare Pages
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:  # 手動実行も可
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.CONOHA_SSH_KEY }}" > ~/.ssh/conoha_key
-          chmod 600 ~/.ssh/conoha_key
-          ssh-keyscan -p ${{ secrets.CONOHA_PORT || 8022 }} -H ${{ secrets.CONOHA_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
-
-      - name: Deploy via rsync
-        run: |
-          rsync -avz --delete \
-            -e "ssh -p ${{ secrets.CONOHA_PORT || 8022 }} -i ~/.ssh/conoha_key -o StrictHostKeyChecking=no" \
-            ./public/ \
-            ${{ secrets.CONOHA_USER }}@${{ secrets.CONOHA_HOST }}:${{ secrets.CONOHA_DEPLOY_PATH }}/
-
-      - name: Verify deployment
-        run: |
-          echo "✅ デプロイ完了: https://tsurumai-nara.com/copilot.html"
-          echo "（反映まで数分かかる場合があります）"
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy public --project-name=tsurumai-system
