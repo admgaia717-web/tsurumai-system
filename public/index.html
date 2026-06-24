@@ -312,7 +312,7 @@ async function approveReservation() {
     const date=new Date(data.reservation_date), wday=['日','月','火','水','木','金','土'][date.getDay()];
     let emailResult='エラー';
     try {
-      const resp=await fetch('http://localhost:8766/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      const resp=await fetch('https://ftemqjfkibpprtvitgph.supabase.co/functions/v1/notify-driver',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
         to:driver.email, driver_name:driver.name, reservation_id:id, customer:data.user_name_snapshot,
         date:data.reservation_date, wday, time:data.start_time, round_trip:data.is_round_trip, duration:data.duration_minutes,
         pickup_name:data.pickup_location_snapshot, pickup_map:pickupLoc?.google_maps_url||'', pickup_pin:pickupLoc?.pin_confirmed?'確定':'要確認',
