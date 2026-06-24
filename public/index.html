@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>つるまい 受付</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: "Hiragino Sans", "Yu Gothic", sans-serif; line-height: 1.5; color: #1a1a1a; background: #f0f4f8; padding: 8px; font-size: 17px; }
+  .container { max-width: 600px; margin: 0 auto; }
+  header { background: #1a5490; color: white; padding: 10px 14px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  header h1 { font-size: 1em; }
+  .status { font-size: 0.75em; opacity: 0.9; }
+  
+  /* 巨大録音ボタン */
+  .rec-btn {
+    width: 100%; padding: 32px; margin: 8px 0;
+    font-size: 1.4em; font-weight: bold; color: white;
+    background: #e53935; border: none; border-radius: 16px;
+    cursor: pointer; transition: all 0.2s; min-height: 90px;
+    box-shadow: 0 4px 12px rgba(229,57,53,0.3);
+  }
+  .rec-btn.recording { background: #c62828; animation: pulse 1.2s infinite; box-shadow: 0 4px 12px rgba(198,40,40,0.5); }
+  .rec-btn:active { transform: scale(0.98); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.75; } }
+  
+  .rec-btn-stop { background: #555 !important; box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important; }
+  
+  /* 文字起こし表示 */
+  .transcript {
+    background: #f7f9fc; border: 2px solid #e0e8f0; border-radius: 8px;
+    padding: 10px; min-height: 80px; max-height: 120px; overflow-y: auto;
+    font-size: 0.95em; margin: 8px 0;
+  }
+  .transcript .interim { color: #999; font-style: italic; }
+  .transcript .placeholder { color: #999; text-align: center; padding: 20px 0; }
+  
+  /* AI助言 */
+  .ai-chat {
+    background: #f0f7f0; border: 2px solid #c8e6c8; border-radius: 8px;
+    padding: 8px; max-height: 100px; overflow-y: auto; font-size: 0.85em;
+    margin: 8px 0;
+  }
+  .chat-msg { margin-bottom: 6px; padding: 5px 8px; border-radius: 4px; }
+  .chat-ai { background: white; border-left: 3px solid #1a5490; }
+  .chat-ok { background: #e8f5e9; border-left: 3px solid #43a047; }
+  .chat-warn { background: #fff8e1; border-left: 3px solid #f9a825; }
+  
+  /* 予約草案フォーム */
+  .draft { background: white; border-radius: 8px; padding: 10px; margin-top: 8px; }
+  .draft h2 { font-size: 0.95em; color: #1a5490; margin-bottom: 8px; border-bottom: 2px solid #eef4fb; padding-bottom: 4px; }
+  .field { margin-bottom: 8px; }
+  .field label { display: block; font-size: 0.8em; color: #555; margin-bottom: 2px; font-weight: bold; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 8px; border: 2px solid #ccc; border-radius: 6px;
+    font-size: 1em; font-family: inherit;
+  }
+  .field input:focus, .field select:focus { outline: none; border-color: #1a5490; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  
+  /* 場所プレビュー */
+  .loc-preview { background: #eef4fb; border-radius: 6px; padding: 6px 8px; font-size: 0.8em; margin-top: 4px; }
+  .loc-preview a { color: #1a5490; }
+  
+  /* スケジュール判定 */
+  .sched { border-radius: 6px; padding: 5px 8px; font-size: 0.85em; margin-top: 4px; }
+  .sched-ok { background: #e8f5e9; color: #2e7d32; border: 1px solid #81c784; }
+  .sched-ng { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+  .sched-warn { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+  
+  /* 巨大承認ボタン */
+  .approve-btn {
+    width: 100%; padding: 24px; margin-top: 12px;
+    font-size: 1.2em; font-weight: bold; color: white;
+    background: #2e7d32; border: none; border-radius: 12px;
+    cursor: pointer; min-height: 70px;
+    box-shadow: 0 4px 12px rgba(46,125,50,0.3);
+  }
+  .approve-btn:active { transform: scale(0.98); }
+  .approve-btn:disabled { background: #999; box-shadow: none; }
+  
+  .reset-btn { width: 100%; padding: 10px; margin-top: 6px; font-size: 0.9em; background: #999; color: white; border: none; border-radius: 6px; }
+  
+  .db-status { font-size: 0.75em; color: #666; margin-top: 6px; text-align: center; min-height: 1em; }
+  .info { font-size: 0.75em; color: #888; background: #f5f5f5; padding: 6px; border-radius: 4px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+  <h1>📞 つるまい 受付</h1>
+  <div class="status" id="status">読込中...</div>
+</header>
+
+<!-- 巨大録音ボタン -->
+<button class="rec-btn" id="recBtn">🔴 電話に出たら<br>タップして録音開始</button>
+
+<!-- 文字起こし -->
+<div class="transcript" id="transcript"><div class="placeholder">録音すると会話がここに表示されます</div></div>
+
+<!-- AI助言 -->
+<div class="ai-chat" id="aiChat">
+  <div class="chat-msg chat-ai">🤖 電話に出たら赤いボタンを押してください。会話を聞きながら予約草案を作ります。</div>
+</div>
+
+<!-- 予約草案 -->
+<div class="draft">
+  <h2>📋 予約草案 <small style="font-weight:normal;color:#888">（確認して承認）</small></h2>
+  
+  <div class="field">
+    <label>利用者名 *</label>
+    <input type="text" id="userName" list="userList" placeholder="氏名（過去データ補完）" oninput="onUserInput()">
+    <datalist id="userList"></datalist>
+  </div>
+  
+  <div class="row2">
+    <div class="field"><label>予約日 *</label><input type="date" id="resvDate" onchange="onDraftChange()"></div>
+    <div class="field"><label>時刻 *</label><input type="time" id="resvTime" onchange="onDraftChange()"></div>
+  </div>
+  
+  <div class="field">
+    <label>迎え場所 *</label>
+    <select id="pickupLoc" onchange="onDraftChange()"><option value="">-- 選択 --</option></select>
+    <div class="loc-preview" id="pickupPreview" style="display:none;"></div>
+  </div>
+  
+  <div class="field">
+    <label>送り場所 *</label>
+    <select id="dropoffLoc" onchange="onDraftChange()"><option value="">-- 選択 --</option></select>
+    <div class="loc-preview" id="dropoffPreview" style="display:none;"></div>
+  </div>
+  
+  <div class="row3">
+    <div class="field"><label>往復</label><select id="roundTrip"><option value="false">片道</option><option value="true">往復</option></select></div>
+    <div class="field"><label>所要</label><select id="duration"><option value="20">20分</option><option value="30">30分</option></select></div>
+    <div class="field"><label>ドライバー</label><select id="driverSel"><option value="">--</option></select></div>
+  </div>
+  
+  <div class="field">
+    <label>備考（階段・車いす等）</label>
+    <textarea id="notes" rows="1" placeholder="特記事項があれば"></textarea>
+  </div>
+  
+  <div id="schedBox"></div>
+  
+  <button class="approve-btn" id="approveBtn" onclick="approveReservation()">✅ 確認しました。承認</button>
+  <button class="reset-btn" onclick="resetDraft()">クリア</button>
+  <div class="db-status" id="dbStatus"></div>
+</div>
+
+<div class="info">
+  ℹ️ 使い方：①電話に出る ②赤ボタンタップ ③話す ④切る ⑤確認して承認ボタン
+</div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sbClient = window.supabase.createClient(
+  "https://ftemqjfkibpprtvitgph.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0ZW1xamZraWJwcHJ0dml0Z3BoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNzE3ODYsImV4cCI6MjA5Nzg0Nzc4Nn0.8cb_rhAMApAFQ7R6KiQN5e56V6dnZvxa107Nx2tnHPY"
+);
+const RULES = { days:[1,3,5], dayNames:['日','月','火','水','木','金','土'], slots:[{s:'09:00',e:'12:00'},{s:'13:00',e:'16:00'}], maxPerHour:3 };
+let LOCATIONS=[], USERS=[], EXISTING=[], DRIVERS=[];
+
+async function loadAll() {
+  try {
+    const [locRes,usrRes,resRes,drvRes] = await Promise.all([
+      sbClient.from('locations').select('*').order('reference_count',{ascending:false}),
+      sbClient.from('users').select('*').order('reservation_count',{ascending:false}),
+      sbClient.from('reservations').select('reservation_date,start_time,duration_minutes,user_name_snapshot').gte('reservation_date', new Date().toISOString().split('T')[0]),
+      sbClient.from('drivers').select('*').eq('is_active',true).order('driver_id'),
+    ]);
+    LOCATIONS=locRes.data||[]; USERS=usrRes.data||[]; EXISTING=resRes.data||[]; DRIVERS=drvRes.data||[];
+    document.getElementById('status').textContent = '✅('+LOCATIONS.length+'場所/'+USERS.length+'人/'+DRIVERS.length+'D)';
+    initUI();
+  } catch(e) {
+    document.getElementById('status').textContent = '⚠️ '+e.message;
+  }
+}
+
+function initUI() {
+  const p=document.getElementById('pickupLoc'), d=document.getElementById('dropoffLoc'), u=document.getElementById('userList'), dr=document.getElementById('driverSel');
+  LOCATIONS.forEach(l=>{ p.add(new Option(l.name,l.location_id)); d.add(new Option(l.name,l.location_id)); });
+  USERS.forEach(x=>{ const o=document.createElement('option'); o.value=x.name; u.appendChild(o); });
+  DRIVERS.forEach(x=>{ dr.add(new Option(x.name,x.driver_id)); });
+  document.getElementById('resvDate').value = new Date().toISOString().split('T')[0];
+  if(DRIVERS.length===1) dr.value = DRIVERS[0].driver_id; // 1名なら自動選択
+}
+
+function onUserInput() {
+  const name = document.getElementById('userName').value.trim();
+  const user = USERS.find(u => u.name === name);
+  if (user && user.is_regular) {
+    document.getElementById('duration').value = '30';
+    addChat('ok', '常連の'+user.name+'さん。30分枠設定。');
+  }
+  onDraftChange();
+}
+
+function onDraftChange() {
+  // 場所プレビュー
+  [['pickupLoc','pickupPreview'],['dropoffLoc','dropoffPreview']].forEach(([selId,prevId])=>{
+    const id = document.getElementById(selId).value;
+    const prev = document.getElementById(prevId);
+    if(id){ const loc=LOCATIONS.find(x=>x.location_id===id);
+      if(loc && loc.google_maps_url){ prev.style.display='block'; prev.innerHTML='🗺️ <a href="'+loc.google_maps_url+'" target="_blank">地図を開く</a>'+(loc.pin_confirmed?' <small>📍確定</small>':' <small>要確認</small>'); }
+      else { prev.style.display='block'; prev.innerHTML='<small>地図未登録</small>'; }
+    } else prev.style.display='none';
+  });
+  // スケジュール判定
+  const date=document.getElementById('resvDate').value, time=document.getElementById('resvTime').value;
+  const box=document.getElementById('schedBox');
+  if(!date||!time){ box.innerHTML=''; return; }
+  const result=checkSchedule(date,time);
+  let cls = result.ok?'sched-ok':(result.blocked?'sched-ng':'sched-warn');
+  box.innerHTML='<div class="sched '+cls+'">'+result.msg+'</div>'+(result.alt?'<div class="sched sched-ok">'+result.alt+'</div>':'');
+}
+
+function checkSchedule(date,time) {
+  const d=new Date(date+'T00:00:00'), dn=RULES.dayNames[d.getDay()];
+  const [hh,mm]=time.split(':').map(Number), tMin=hh*60+mm;
+  let msgs=[], alt='', blocked=false;
+  if(!RULES.days.includes(d.getDay())){ msgs.push(dn+'曜日は運行日外（月水金）'); blocked=true; }
+  let inSlot=false;
+  for(const s of RULES.slots){ const[sh,sm]=s.s.split(':').map(Number),[eh,em]=s.e.split(':').map(Number); if(tMin>=sh*60+sm&&tMin<eh*60+em) inSlot=true; }
+  if(!inSlot){ msgs.push(time+'は運行時間外（9-12/13-16時）'); blocked=true; }
+  const conflicts=EXISTING.filter(r=>r.reservation_date===date);
+  const sameHour=conflicts.filter(r=>parseInt(r.start_time.split(':')[0])===hh);
+  const duration=parseInt(document.getElementById('duration').value);
+  if(sameHour.length>=RULES.maxPerHour){ msgs.push(hh+'時台は'+sameHour.length+'件で満杯'); blocked=true; alt='💡 '+(hh+1)+':00なら空き'; }
+  else if(conflicts.some(r=>{const[rh,rm]=r.start_time.split(':').map(Number);return Math.abs((rh*60+rm)-tMin)<duration;})){ const c=conflicts.find(r=>{const[rh,rm]=r.start_time.split(':').map(Number);return Math.abs((rh*60+rm)-tMin)<duration;}); msgs.push(c.start_time+'の'+c.user_name_snapshot+'さんと重複'); let nm=tMin+20; while(conflicts.some(r=>{const[rh,rm]=r.start_time.split(':').map(Number);return Math.abs((rh*60+rm)-nm)<duration;}))nm+=20; alt='💡 '+String(Math.floor(nm/60)).padStart(2,'0')+':'+String(nm%60).padStart(2,'0')+'なら空き'; }
+  else { msgs.push(hh+'時台は既存'+sameHour.length+'件・あと'+(RULES.maxPerHour-sameHour.length)+'件OK'); }
+  return {msg:msgs.join(' / '), alt, ok:msgs.some(m=>m.includes('OK')), blocked};
+}
+
+function addChat(type,msg) {
+  const log=document.getElementById('aiChat');
+  const div=document.createElement('div'); div.className='chat-msg chat-'+type;
+  const lbl=type==='ai'?'🤖':(type==='warn'?'⚠️':'✅');
+  div.innerHTML='<b>'+lbl+'</b> '+msg;
+  log.appendChild(div); log.scrollTop=log.scrollHeight;
+}
+
+// === 録音 ===
+let recognition=null, isRec=false, fullT='';
+function setupRec() {
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ alert('Chrome/Safari推奨です'); return null; }
+  const r=new SR(); r.lang='ja-JP'; r.continuous=true; r.interimResults=true;
+  r.onresult=(e)=>{ let im=''; for(let i=e.resultIndex;i<e.results.length;i++){ const t=e.results[i][0].transcript; if(e.results[i].isFinal){fullT+=t;analyze(t);}else im+=t; } const el=document.getElementById('transcript'); el.innerHTML='<div>'+fullT+'</div>'+(im?'<div class="interim">'+im+'</div>':''); el.scrollTop=el.scrollHeight; };
+  r.onend=()=>{ if(isRec){try{r.start();}catch(e){}} };
+  return r;
+}
+function analyze(text) {
+  setTimeout(()=>{
+    const tm=text.match(/(\d{1,2})時(\d{1,2})?分?/);
+    if(tm){document.getElementById('resvTime').value=String(tm[1]).padStart(2,'0')+':'+String(tm[2]||'00').padStart(2,'0'); addChat('ai',tm[1]+'時'+(tm[2]||'00')+'分'); onDraftChange();}
+    LOCATIONS.forEach(l=>{ if(text.includes(l.name)){ if(text.includes('から')||text.includes('迎え')){document.getElementById('pickupLoc').value=l.location_id;addChat('ai','迎え:'+l.name);} else {document.getElementById('dropoffLoc').value=l.location_id;addChat('ai','送り:'+l.name);} onDraftChange(); }});
+    if(text.includes('往復')||text.includes('帰りも')){document.getElementById('roundTrip').value='true';addChat('ai','往復');}
+  },500);
+}
+document.getElementById('recBtn').onclick=()=>{
+  if(!recognition)recognition=setupRec();
+  if(!recognition)return;
+  if(!isRec){
+    recognition.start(); isRec=true; fullT='';
+    const b=document.getElementById('recBtn');
+    b.classList.add('recording'); b.innerHTML='⏹️ 録音中<br><small>話し終わったらタップで停止</small>';
+    addChat('ai','録音開始。会話を聞きながら草案を作ります。');
+  } else {
+    recognition.stop(); isRec=false;
+    const b=document.getElementById('recBtn');
+    b.classList.remove('recording'); b.innerHTML='🔴 電話に出たら<br>タップして録音開始';
+    addChat('ok','録音停止。草案を確認して承認してください。');
+  }
+};
+
+async function approveReservation() {
+  const userId=USERS.find(u=>u.name===document.getElementById('userName').value)?.user_id||null;
+  const driverId=document.getElementById('driverSel').value||null;
+  const driver=DRIVERS.find(d=>d.driver_id==driverId);
+  const data={
+    user_id:userId, user_name_snapshot:document.getElementById('userName').value,
+    reservation_date:document.getElementById('resvDate').value, start_time:document.getElementById('resvTime').value,
+    duration_minutes:parseInt(document.getElementById('duration').value),
+    pickup_location_id:document.getElementById('pickupLoc').value||null, pickup_location_snapshot:locName(document.getElementById('pickupLoc').value),
+    dropoff_location_id:document.getElementById('dropoffLoc').value||null, dropoff_location_snapshot:locName(document.getElementById('dropoffLoc').value),
+    is_round_trip:document.getElementById('roundTrip').value==='true', status:'approved', channel:'phone-ai',
+    driver_id:driverId?parseInt(driverId):null, notes:document.getElementById('notes').value||null,
+    transcript:fullT||null, approved_at:new Date().toISOString(),
+  };
+  const miss=[];
+  if(!data.user_name_snapshot)miss.push('利用者名'); if(!data.start_time)miss.push('時刻');
+  if(!data.pickup_location_id)miss.push('迎え'); if(!data.dropoff_location_id)miss.push('送り'); if(!driverId)miss.push('ドライバー');
+  if(miss.length){alert('入力不足:\n'+miss.join('\n'));return;}
+  
+  const btn=document.getElementById('approveBtn');
+  btn.disabled=true; btn.textContent='💾 保存中...';
+  document.getElementById('dbStatus').textContent='💾 DB保存中...';
+  try {
+    const{data:result,error}=await sbClient.from('reservations').insert([data]).select();
+    if(error)throw error;
+    const id=result[0].reservation_id;
+    EXISTING.push({reservation_date:data.reservation_date,start_time:data.start_time,duration_minutes:data.duration_minutes,user_name_snapshot:data.user_name_snapshot});
+    document.getElementById('dbStatus').textContent='✅ 保存ID:'+id+' / メール送信中...';
+    addChat('ok','予約確定(ID:'+id+')。ドライバーへ通知。');
+    // メール通知
+    const pickupLoc=LOCATIONS.find(x=>x.location_id===data.pickup_location_id);
+    const dropoffLoc=LOCATIONS.find(x=>x.location_id===data.dropoff_location_id);
+    const date=new Date(data.reservation_date), wday=['日','月','火','水','木','金','土'][date.getDay()];
+    let emailResult='エラー';
+    try {
+      const resp=await fetch('http://localhost:8766/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        to:driver.email, driver_name:driver.name, reservation_id:id, customer:data.user_name_snapshot,
+        date:data.reservation_date, wday, time:data.start_time, round_trip:data.is_round_trip, duration:data.duration_minutes,
+        pickup_name:data.pickup_location_snapshot, pickup_map:pickupLoc?.google_maps_url||'', pickup_pin:pickupLoc?.pin_confirmed?'確定':'要確認',
+        dropoff_name:data.dropoff_location_snapshot, dropoff_map:dropoffLoc?.google_maps_url||'', dropoff_pin:dropoffLoc?.pin_confirmed?'確定':'要確認',
+        notes:data.notes||''
+      })});
+      const r=await resp.json(); emailResult=r.status==='sent'?'送信成功':('送信('+r.message+')');
+    } catch(e){ emailResult='通知サーバー未起動'; }
+    document.getElementById('dbStatus').textContent='✅ 全完了 ID:'+id+' / '+emailResult;
+    btn.textContent='✅ 完了';
+    addChat('ok','ドライバー通知: '+emailResult);
+    setTimeout(()=>{ btn.disabled=false; btn.textContent='✅ 確認しました。承認'; resetDraft(); }, 1500);
+  } catch(e) {
+    btn.disabled=false; btn.textContent='✅ 確認しました。承認';
+    document.getElementById('dbStatus').textContent='⚠️ '+e.message;
+    alert('エラー: '+e.message);
+  }
+}
+function locName(id){const l=LOCATIONS.find(x=>x.location_id===id);return l?l.name:id;}
+function resetDraft() {
+  ['userName','notes'].forEach(id=>document.getElementById(id).value='');
+  ['pickupLoc','dropoffLoc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('resvDate').value=new Date().toISOString().split('T')[0];
+  document.getElementById('resvTime').value=''; document.getElementById('duration').value='20';
+  document.getElementById('roundTrip').value='false';
+  ['pickupPreview','dropoffPreview'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('schedBox').innerHTML='';
+  document.getElementById('dbStatus').textContent='';
+  if(DRIVERS.length===1)document.getElementById('driverSel').value=DRIVERS[0].driver_id;
+}
+loadAll();
+</script>
+</body>
+</html>
