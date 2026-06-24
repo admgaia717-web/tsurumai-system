@@ -214,7 +214,7 @@ function onDraftChange() {
   const box=document.getElementById('schedBox');
   if(!date||!time){ box.innerHTML=''; return; }
   const result=checkSchedule(date,time);
-  let cls = result.ok?'sched-ok':(result.blocked?'sched-ng':'sched-warn');
+  let cls = result.blocked?'sched-ng':(result.ok?'sched-ok':'sched-warn');
   box.innerHTML='<div class="sched '+cls+'">'+result.msg+'</div>'+(result.alt?'<div class="sched sched-ok">'+result.alt+'</div>':'');
 }
 
@@ -231,7 +231,7 @@ function checkSchedule(date,time) {
   const duration=parseInt(document.getElementById('duration').value);
   if(sameHour.length>=RULES.maxPerHour){ msgs.push(hh+'時台は'+sameHour.length+'件で満杯'); blocked=true; alt='💡 '+(hh+1)+':00なら空き'; }
   else if(conflicts.some(r=>{const[rh,rm]=r.start_time.split(':').map(Number);return Math.abs((rh*60+rm)-tMin)<duration;})){ const c=conflicts.find(r=>{const[rh,rm]=r.start_time.split(':').map(Number);return Math.abs((rh*60+rm)-tMin)<duration;}); msgs.push(c.start_time+'の'+c.user_name_snapshot+'さんと重複'); let nm=tMin+20; while(conflicts.some(r=>{const[rh,rm]=r.start_time.split(':').map(Number);return Math.abs((rh*60+rm)-nm)<duration;}))nm+=20; alt='💡 '+String(Math.floor(nm/60)).padStart(2,'0')+':'+String(nm%60).padStart(2,'0')+'なら空き'; }
-  else { msgs.push(hh+'時台は既存'+sameHour.length+'件・あと'+(RULES.maxPerHour-sameHour.length)+'件OK'); }
+  else if(!blocked){ msgs.push(hh+'時台は既存'+sameHour.length+'件・あと'+(RULES.maxPerHour-sameHour.length)+'件OK'); }
   return {msg:msgs.join(' / '), alt, ok:msgs.some(m=>m.includes('OK')), blocked};
 }
 
